@@ -8,7 +8,7 @@
 
 # Contexto de la Tarea
 
-## API REST:
+## API REST (api/app.py):
 - Construida con FastAPI, gestiona los datos de inventario. 
 - Expone endpoints para listar productos, registrar nuevos, actualizar cantidades y obtener alertas de stock bajo.
 - Los productos se almacenan en un fichero CSV para que los datos persistan entre sesiones.
@@ -21,7 +21,7 @@
     - **GET /inventory/alerts**: devuelve todos los productos cuya cantidad sea inferior al umbral configurable (por defecto: inferior a 10)
 - Todos los endpoints deben devolver codigos de estado HTTP apropiados y mensajes descriptivos de error.
 
-## Agente de IA:
+## Agente de IA (agent.py):
 - Escrito en Python que se conecte a un LLM (GROQ).
 - Utiliza la API REST anterior como conjunto de herramientas.
 - El agente funciona en bucle: 
