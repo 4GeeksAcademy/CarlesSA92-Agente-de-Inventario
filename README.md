@@ -14,6 +14,22 @@ $ python main.py
 
 You can create and include as many python files (a.k.a. modules) as you want using the import statements.
 
+## Starting the project
+
+You'll need two terminals to run this project:
+
+### Terminal 1 — Start the API
+
+```bash
+uvicorn api.app:app --reload
+```
+
+### Terminal 2 — Start the agent
+
+```bash
+python agent.py
+```
+
 ## Requirements
 
 Make sure you have Python installed in your computer. We strongly recommend [installing Python through Pyenv ](https://4geeks.com/how-to/what-is-pyenv-and-how-to-install-pyenv) to avoid version conflicts in the future.

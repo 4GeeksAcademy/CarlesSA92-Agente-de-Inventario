@@ -14,6 +14,22 @@ $ python main.py
 
 Puedes crear e incluir tantos archivos de Python (también conocidos como módulos) como desees utilizando las declaraciones de importación.
 
+## Arrancar el proyecto
+
+Necesitarás dos terminales para ejecutar este proyecto:
+
+### Terminal 1 — Arrancar la API
+
+```bash
+uvicorn api.app:app --reload
+```
+
+### Terminal 2 — Arrancar el agente
+
+```bash
+python agent.py
+```
+
 ## Requisitos
 
 Asegúrate de tener Python instalado en tu computadora. Te recomendamos encarecidamente [instalar Python a través de Pyenv](https://4geeks.com/es/how-to/que-es-pyenv-y-como-instalar-pyenv) para evitar conflictos de versiones en el futuro.
