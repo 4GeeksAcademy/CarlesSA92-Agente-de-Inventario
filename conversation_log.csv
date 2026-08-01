@@ -7,3 +7,77 @@ user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2
 agent,"Error: Error al comunicarse con GROQ: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kyjecjshepevbdxpegyzjn5c` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98718, Requested 5305. Please try again in 57m55.872s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,2026-07-31T22:53:23.140383+00:00
 system,Sesión interrumpida (Ctrl+C),,2026-07-31T22:53:47.207043+00:00
 system,Sesión de agente finalizada,,2026-07-31T22:53:47.208186+00:00
+system,Sesión de agente iniciada,,2026-08-01T00:13:40.291559+00:00
+user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2026-08-01T00:13:46.694982+00:00
+agent,Error: GROQ_API_KEY no configurada. Ejecuta: export GROQ_API_KEY=tu-api-key,,2026-08-01T00:13:46.695472+00:00
+system,Sesión interrumpida (Ctrl+C),,2026-08-01T00:14:07.814116+00:00
+system,Sesión de agente finalizada,,2026-08-01T00:14:07.814403+00:00
+system,Sesión de agente iniciada,,2026-08-01T00:14:29.838800+00:00
+user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2026-08-01T00:14:36.840527+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(30kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(50paquetes),list_products,2026-08-01T00:14:38.223425+00:00
+agent,"Error: Error al comunicarse con GROQ: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kyjecjshepevbdxpegyzjn5c` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98447, Requested 5455. Please try again in 56m11.328s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,2026-08-01T00:14:38.276618+00:00
+system,Sesión de agente iniciada,,2026-08-01T10:44:07.346232+00:00
+user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2026-08-01T10:45:10.739350+00:00
+agent,Error: GROQ_API_KEY no configurada. Ejecuta: export GROQ_API_KEY=tu-api-key,,2026-08-01T10:45:10.739694+00:00
+system,Sesión interrumpida (Ctrl+C),,2026-08-01T10:45:13.642895+00:00
+system,Sesión de agente finalizada,,2026-08-01T10:45:13.643100+00:00
+system,Sesión de agente iniciada,,2026-08-01T10:45:35.137638+00:00
+user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2026-08-01T10:45:50.060883+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(30kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(50paquetes),list_products,2026-08-01T10:45:51.675720+00:00
+tool,"{""id"":10,""name"":""Galletas de Mantequilla"",""quantity"":10,""unit"":""paquetes""}",update_stock,2026-08-01T10:45:51.985988+00:00
+tool,"{""id"":3,""name"":""Azúcar Blanco"",""quantity"":5,""unit"":""kg""}",update_stock,2026-08-01T10:46:14.312205+00:00
+tool,ALERTAS|3:Azúcar Blanco(5kg)|9:Canela Molida(8kg),get_alerts,2026-08-01T10:46:41.757851+00:00
+agent,"Se han actualizado los stocks de Galletas de Mantequilla y Azúcar Blanco. 
+Galletas de Mantequilla (10 paquetes)
+Azúcar Blanco (5 kg)
+Canela Molida (8 kg) están cerca de agotarse.",,2026-08-01T10:46:42.081939+00:00
+user,dime los productos que quede poco stock,,2026-08-01T10:47:01.419321+00:00
+tool,"{""error"": ""argument of type 'NoneType' is not iterable""}",get_alerts,2026-08-01T10:47:01.671425+00:00
+tool,"{""error"": ""argument of type 'NoneType' is not iterable""}",get_alerts,2026-08-01T10:47:01.872613+00:00
+tool,"{""error"": ""argument of type 'NoneType' is not iterable""}",get_alerts,2026-08-01T10:47:02.098736+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(5kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(10paquetes),list_products,2026-08-01T10:47:02.394185+00:00
+tool,"{""error"": ""argument of type 'NoneType' is not iterable""}",get_alerts,2026-08-01T10:47:02.395016+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(5kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(10paquetes),list_products,2026-08-01T10:47:04.673685+00:00
+tool,"{""error"": ""argument of type 'NoneType' is not iterable""}",get_alerts,2026-08-01T10:47:04.674049+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(5kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(10paquetes),list_products,2026-08-01T10:47:12.929631+00:00
+tool,"{""error"": ""argument of type 'NoneType' is not iterable""}",get_alerts,2026-08-01T10:47:12.929808+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(5kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(10paquetes),list_products,2026-08-01T10:47:23.397543+00:00
+tool,"{""error"": ""argument of type 'NoneType' is not iterable""}",get_alerts,2026-08-01T10:47:23.397828+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(5kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(10paquetes),list_products,2026-08-01T10:47:33.744045+00:00
+tool,ALERTAS|3:Azúcar Blanco(5kg)|9:Canela Molida(8kg),get_alerts,2026-08-01T10:47:33.746780+00:00
+agent,Los productos con stock bajo son Azúcar Blanco (5 kg) y Canela Molida (8 kg).,,2026-08-01T10:47:45.038076+00:00
+system,Sesión interrumpida (Ctrl+C),,2026-08-01T11:03:14.235661+00:00
+system,Sesión de agente finalizada,,2026-08-01T11:03:14.235838+00:00
+system,Sesión de agente iniciada,,2026-08-01T11:03:27.550889+00:00
+user,dime que productos tienen bajo stock,,2026-08-01T11:03:37.422549+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(5kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(10paquetes),list_products,2026-08-01T11:03:38.021335+00:00
+tool,ALERTAS|3:Azúcar Blanco(5kg)|9:Canela Molida(8kg),get_alerts,2026-08-01T11:03:38.024505+00:00
+agent,Tenemos los siguientes productos con bajo stock: Azúcar Blanco (5 kg) y Canela Molida (8 kg).,,2026-08-01T11:03:38.263526+00:00
+system,Sesión interrumpida (Ctrl+C),,2026-08-01T11:06:58.281241+00:00
+system,Sesión de agente finalizada,,2026-08-01T11:06:58.281560+00:00
+system,Sesión de agente iniciada,,2026-08-01T11:07:00.213313+00:00
+user,dime los productos bajos en stock,,2026-08-01T11:07:12.540976+00:00
+tool,LISTA|1:Café Arábica Molido(25kg)|2:Leche Entera(40litros)|3:Azúcar Blanco(5kg)|4:Cápsulas Espresso(200unidades)|5:Filtros de Papel(500unidades)|6:Jarabe de Vainilla(15litros)|7:Chocolate en Polvo(12kg)|8:Vasos Térmicos 8oz(300unidades)|9:Canela Molida(8kg)|10:Galletas de Mantequilla(10paquetes),list_products,2026-08-01T11:07:13.301658+00:00
+tool,ALERTAS|3:Azúcar Blanco(5kg)|9:Canela Molida(8kg),get_alerts,2026-08-01T11:07:13.304733+00:00
+agent,"Error: Error al comunicarse con GROQ: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kyjecjshepevbdxpegyzjn5c` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99833, Requested 5475. Please try again in 1h16m26.112s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,2026-08-01T11:07:13.378857+00:00
+system,Sesión de agente iniciada,,2026-08-01T11:12:22.718444+00:00
+user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2026-08-01T11:12:22.718824+00:00
+agent,Error: GROQ_API_KEY no configurada. Ejecuta: export GROQ_API_KEY=tu-api-key,,2026-08-01T11:12:22.718987+00:00
+agent,Sesión finalizada por el usuario,,2026-08-01T11:12:22.719084+00:00
+system,Sesión de agente finalizada,,2026-08-01T11:12:22.719149+00:00
+system,Sesión de agente iniciada,,2026-08-01T11:12:36.962917+00:00
+user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2026-08-01T11:12:36.963232+00:00
+agent,Error: GROQ_API_KEY no configurada. Ejecuta: export GROQ_API_KEY=tu-api-key,,2026-08-01T11:12:36.963425+00:00
+user,dime los productos que quede poco stock,,2026-08-01T11:12:36.963570+00:00
+agent,Error: GROQ_API_KEY no configurada. Ejecuta: export GROQ_API_KEY=tu-api-key,,2026-08-01T11:12:36.963691+00:00
+agent,Sesión finalizada por el usuario,,2026-08-01T11:12:36.963803+00:00
+system,Sesión de agente finalizada,,2026-08-01T11:12:36.963882+00:00
+system,Sesión de agente iniciada,,2026-08-01T11:12:48.061389+00:00
+user,Se han gastado 40 paquetes de Galletas de Mantequilla y 25 kg de Azúcar,,2026-08-01T11:12:48.061604+00:00
+agent,"Error: Error al comunicarse con GROQ: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kyjecjshepevbdxpegyzjn5c` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99446, Requested 5305. Please try again in 1h8m24.863999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,2026-08-01T11:12:48.414631+00:00
+user,dime los productos que quede poco stock,,2026-08-01T11:12:48.414877+00:00
+agent,"Error: Error al comunicarse con GROQ: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kyjecjshepevbdxpegyzjn5c` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99446, Requested 5481. Please try again in 1h10m56.928s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",,2026-08-01T11:12:48.478259+00:00
+agent,Sesión finalizada por el usuario,,2026-08-01T11:12:48.478624+00:00
+system,Sesión de agente finalizada,,2026-08-01T11:12:48.478742+00:00
+system,Sesión interrumpida (Ctrl+C),,2026-08-01T11:14:16.655071+00:00
+system,Sesión de agente finalizada,,2026-08-01T11:14:16.655264+00:00

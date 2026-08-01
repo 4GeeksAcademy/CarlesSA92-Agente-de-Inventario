@@ -152,6 +152,10 @@ def run_tool(tool_name: str, args: dict) -> str:
     Ejecuta una herramienta llamando al endpoint correspondiente de la API.
     Devuelve el resultado en formato ultra-compacto para ahorrar tokens.
     """
+    # Protección contra args None (ocurre cuando el LLM envía "null" como argumentos)
+    if args is None:
+        args = {}
+
     if tool_name == "list_products":
         result = _call_api("GET", "/inventory")
         # Compactar: solo IDs, nombres, cantidades para ahorrar tokens
@@ -525,12 +529,30 @@ def run_agent():
                     # Procesar CADA tool call que el LLM haya solicitado
                     for tool_call in tool_calls:
                         tool_name = tool_call.function.name
-                        tool_args = json.loads(tool_call.function.arguments)
+                        tool_args = json.loads(tool_call.function.arguments) or {}
 
-                        print(f"\n🔧  Usando: {tool_name}")
+                        # ─── Mensajes amigables según la tool ───
+                        TOOL_MESSAGES = {
+                            "list_products": "📋 Aquí tienes la lista de productos:",
+                            "get_alerts": "⚠️ Estos son los productos con poco stock:",
+                            "add_product": "➕ Producto añadido correctamente:",
+                            "update_stock": "📦 Stock actualizado:",
+                        }
+                        tool_display = TOOL_MESSAGES.get(tool_name, f"🔧  Usando: {tool_name}")
+
+                        print(f"\n{tool_display}")
                         if tool_args:
-                            args_preview = json.dumps(tool_args, ensure_ascii=False)
-                            print(f"     Args: {args_preview}")
+                            if tool_name == "update_stock":
+                                delta = tool_args.get("delta", 0)
+                                acción = "entrada de" if delta > 0 else "salida de"
+                                print(f"     {acción} {abs(delta)} unidades (ID: {tool_args.get('product_id', '?')})")
+                            elif tool_name == "add_product":
+                                print(f"     {tool_args.get('name', '')} — {tool_args.get('quantity', '')} {tool_args.get('unit', '')}")
+                            elif tool_name == "get_alerts" and "threshold" in tool_args:
+                                print(f"     Umbral: {tool_args['threshold']} unidades")
+                            elif tool_args:
+                                args_preview = json.dumps(tool_args, ensure_ascii=False)
+                                print(f"     Args: {args_preview}")
 
                         # Ejecutar la tool llamando a la API (con protección)
                         try:
