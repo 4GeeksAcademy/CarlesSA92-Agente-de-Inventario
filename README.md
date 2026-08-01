@@ -1,39 +1,190 @@
-# Python Hello
+# Inventory Agent — Coffee Supply Store 🤖☕
 
-The most basic boilerplate to start a Python project at 4Geeks is to start your very first Python project from scratch.
+AI-powered inventory management system for a coffee supply store. Manage your stock using **natural language**. The agent connects to GROQ (LLM) and uses a REST API as its toolset.
 
-## What to do next?
+## 📦 What's included?
 
-Open the `main.py` file and start writing your code.
+- **REST API** (`api/app.py`) — Built with FastAPI, manages products in a CSV file.
+- **AI Agent** (`agent.py`) — Manual loop (Observe → Think → Act → Update) that chats with you via terminal.
+- **Conversation log** (`conversation_log.csv`) — All interactions are automatically recorded.
 
-Execute your code by typing the following command on your terminal:
+## ⚙️ Requirements
+
+- Python 3.10 or higher
+- A GROQ API key (free) at [console.groq.com](https://console.groq.com)
+
+## 🚀 How to use
+
+You'll need **two terminals** open at the same time.
+
+### 1. Clone and install dependencies
 
 ```bash
-$ python main.py
+git clone <your-repo>
+cd <project-folder>
+pip install fastapi uvicorn requests groq
 ```
 
-You can create and include as many python files (a.k.a. modules) as you want using the import statements.
+### 2. Set your GROQ API key
 
-## Starting the project
+```bash
+export GROQ_API_KEY=your-api-key
+```
 
-You'll need two terminals to run this project:
+> ⚠️ Run this command in **each terminal** you use, or add it to your `~/.bashrc`.
 
-### Terminal 1 — Start the API
+### 3. Terminal 1 — Start the API (first)
+
+The API **must be running** before you launch the agent.
 
 ```bash
 uvicorn api.app:app --reload
 ```
 
-### Terminal 2 — Start the agent
+This starts the server at `http://localhost:8000`. You can test it with:
+
+```bash
+curl http://localhost:8000/inventory
+```
+
+### 4. Terminal 2 — Start the agent
+
+With the API running, launch the agent:
 
 ```bash
 python agent.py
 ```
 
-## Requirements
+You'll see the agent interface:
 
-Make sure you have Python installed in your computer. We strongly recommend [installing Python through Pyenv ](https://4geeks.com/how-to/what-is-pyenv-and-how-to-install-pyenv) to avoid version conflicts in the future.
+```
+================================================================
+  🤖  AGENTE DE INVENTARIO — Cafetería
+  📦  Gestión de stock por lenguaje natural
+================================================================
+  Special commands:
+    • salir / exit  — End the session
+    • status        — View current configuration
+    • Ctrl+C        — Interrupt
+----------------------------------------------------------------
 
-### Contributors
+👤  You:
+```
 
-This template was built as part of the [4Geeks Python Resources](https://4geeks.com/technology/python) for learning at [4Geeks.com](https://4geeks.com) by [Alejandro Sanchez](https://twitter.com/alesanchezr) and [many other contributors](https://github.com/4GeeksAcademy/python-hello/graphs/contributors).
+### 5. Stop the system
+
+Press `Ctrl+C` first on the agent (Terminal 2), then on the API (Terminal 1).
+
+---
+
+## 🧪 Example prompts for each tool
+
+Try them in order to see all features:
+
+### 📋 list_products — View the full inventory
+
+```
+👤  You: show me all products in the inventory
+```
+
+```
+👤  You: what products do we have in stock?
+```
+
+### ➕ add_product — Add a new product
+
+```
+👤  You: add a new product: Almond Milk, 10 liters
+```
+
+```
+👤  You: we have a new product, add 20 bags of Green Tea
+```
+
+### 📦 update_stock — Update quantities (inbound & outbound)
+
+**Stock out (sale/spend):**
+
+```
+👤  You: we sold 5 kg of Ground Arabica Coffee
+```
+
+```
+👤  You: we used 3 liters of Whole Milk
+```
+
+**Stock in (restock/delivery):**
+
+```
+👤  You: a shipment of 50 packs of Butter Cookies just arrived
+```
+
+```
+👤  You: restock 20 kg of White Sugar
+```
+
+### ⚠️ get_alerts — Low stock products
+
+```
+👤  You: which products are about to run out?
+```
+
+```
+👤  You: show me products with less than 15 units
+```
+
+### 🔄 Full workflow (multiple steps)
+
+```
+👤  You: we've used 10 packs of Butter Cookies and 3 kg of Cocoa Powder
+```
+
+The agent should:
+1. Use `list_products` to get the IDs
+2. Use `update_stock` for each product
+3. Use `get_alerts` to warn if anything is running low
+
+---
+
+## 📁 Project structure
+
+```
+├── api/
+│   ├── app.py          # FastAPI REST API
+│   └── products.csv    # Inventory data (persistent)
+├── agent.py            # AI Agent (manual loop with GROQ)
+├── conversation_log.csv # Session history for all interactions
+├── context.md          # Project context
+├── learn.json          # Template metadata
+├── main.py             # Startup script (not used)
+├── server.py           # Alternative server (not used)
+├── README.md           # This file (English)
+└── README.es.md        # This file (Spanish)
+```
+
+## 📝 Conversation log
+
+Every interaction is automatically saved to `conversation_log.csv` with this format:
+
+| actor | message | tool_call | timestamp |
+|-------|---------|-----------|-----------|
+| user | we used 5 kg of Coffee | | 2026-08-01T10:45:10+00:00 |
+| tool | LISTA\|1:Coffee(20kg)\|... | list_products | 2026-08-01T10:45:51+00:00 |
+| tool | {"id":1,"quantity":15} | update_stock | 2026-08-01T10:45:52+00:00 |
+| agent | Stock updated successfully | | 2026-08-01T10:45:53+00:00 |
+
+## 🛠️ Agent special commands
+
+While in the agent:
+
+- `salir` / `exit` — End the session
+- `status` — Show current configuration (API, model, key, log file)
+
+---
+
+## 📚 Technologies
+
+- **FastAPI** — REST API framework
+- **GROQ (Llama 3.3 70B)** — LLM for the agent
+- **Python 3** — Programming language
+- **CSV** — Persistent product storage
