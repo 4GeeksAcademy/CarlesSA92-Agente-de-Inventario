@@ -338,6 +338,9 @@ def log_event(actor: str, message: str, tool_call: str = "") -> None:
         if not file_exists or os.path.getsize(LOG_FILE) == 0:
             writer.writerow(["actor", "message", "tool_call", "timestamp"])
         writer.writerow([actor, message, tool_call, timestamp])
+        # Separador visual entre sesiones
+        if message == "Sesión de agente finalizada":
+            writer.writerow([])
 
 def _compact_history(msgs: list[dict]) -> list[dict]:
     """
