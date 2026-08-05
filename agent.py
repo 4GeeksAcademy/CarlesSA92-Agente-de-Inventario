@@ -70,20 +70,20 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "update_stock",
-            "description": "Actualiza el stock de un producto existente. Usa delta POSITIVO para entradas (nuevas entregas/reposiciones) y delta NEGATIVO para salidas (ventas, productos usados).",
+            "description": "Actualiza el stock de un producto existente. Usa delta POSITIVO para entradas (nuevas entregas/reposiciones) y delta NEGATIVO para salidas (ventas, productos usados). IMPORTANTE: proporciona el NOMBRE EXACTO del producto (no el ID numérico).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "product_id": {
-                        "type": "integer",
-                        "description": "ID numérico del producto a actualizar (obtenido de list_products)",
+                    "product_name": {
+                        "type": "string",
+                        "description": "Nombre EXACTO del producto a actualizar (ej: 'Café Arábica Molido', 'Leche Entera'). NO uses el ID numérico, usa el nombre.",
                     },
                     "delta": {
                         "type": "integer",
                         "description": "Cantidad a añadir (positivo, ej: +20) o restar (negativo, ej: -5) del stock actual",
                     },
                 },
-                "required": ["product_id", "delta"],
+                "required": ["product_name", "delta"],
             },
         },
     },
@@ -158,12 +158,17 @@ def run_tool(tool_name: str, args: dict) -> str:
 
     if tool_name == "list_products":
         result = _call_api("GET", "/inventory")
-        # Compactar: solo IDs, nombres, cantidades para ahorrar tokens
+        # JSON claro y completo para que el LLM lo entienda bien
         if isinstance(result, list) and not isinstance(result, dict):
-            items = []
+            products_list = []
             for p in result:
-                items.append(f"{p['id']}:{p['name']}({p['quantity']}{p['unit']})")
-            return f"LISTA|{'|'.join(items)}"
+                products_list.append({
+                    "id": int(p["id"]),
+                    "name": p["name"],
+                    "quantity": int(p["quantity"]),
+                    "unit": p["unit"],
+                })
+            return json.dumps({"productos": products_list}, ensure_ascii=False, separators=(",", ":"))
         return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
     elif tool_name == "add_product":
         result = _call_api("POST", "/inventory", {
@@ -171,9 +176,42 @@ def run_tool(tool_name: str, args: dict) -> str:
             "quantity": args["quantity"],
             "unit": args["unit"],
         })
+        # Si el producto ya existe (409), actualizar stock en lugar de fallar
+        if isinstance(result, dict) and "error" in result and "409" in result["error"]:
+            # Buscar el producto existente para obtener su unidad y sumar cantidad
+            inventory = _call_api("GET", "/inventory")
+            if isinstance(inventory, list):
+                for p in inventory:
+                    if p["name"].lower() == args["name"].lower():
+                        product_id = int(p["id"])
+                        update_result = _call_api("PATCH", f"/inventory/{product_id}", {
+                            "delta": args["quantity"],
+                        })
+                        # Añadir nota de que se actualizó en lugar de crear
+                        if isinstance(update_result, dict) and "error" not in update_result:
+                            update_result["_action"] = "updated_existing"
+                        return json.dumps(update_result, ensure_ascii=False, separators=(",", ":"))
         return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
     elif tool_name == "update_stock":
-        result = _call_api("PATCH", f"/inventory/{args['product_id']}", {
+        # Resolver product_name → product_id automáticamente
+        product_name = args.get("product_name", "")
+        if not product_name:
+            return json.dumps({"error": "Falta el nombre del producto (product_name)"}, ensure_ascii=False)
+
+        # Obtener lista de productos para buscar el ID por nombre
+        inventory = _call_api("GET", "/inventory")
+        if isinstance(inventory, list):
+            product_id = None
+            for p in inventory:
+                if p["name"].lower() == product_name.lower():
+                    product_id = int(p["id"])
+                    break
+            if product_id is None:
+                return json.dumps({"error": f"No se encontró ningún producto con el nombre '{product_name}'"}, ensure_ascii=False)
+        else:
+            return json.dumps({"error": f"No se pudo obtener el inventario: {inventory}"}, ensure_ascii=False)
+
+        result = _call_api("PATCH", f"/inventory/{product_id}", {
             "delta": args["delta"],
         })
         return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
@@ -182,14 +220,19 @@ def run_tool(tool_name: str, args: dict) -> str:
         if "threshold" in args:
             params["threshold"] = args["threshold"]
         result = _call_api("GET", "/inventory/alerts", params)
-        # Compactar alertas igual que list_products
+        # JSON claro para que el LLM entienda todos los productos con alerta
         if isinstance(result, list) and not isinstance(result, dict):
-            items = []
+            if not result:
+                return json.dumps({"alerts": [], "mensaje": "No hay productos con stock bajo."}, ensure_ascii=False)
+            alerts_list = []
             for p in result:
-                items.append(f"{p['id']}:{p['name']}({p['quantity']}{p['unit']})")
-            if not items:
-                return "ALERTAS|sin_alertas"
-            return f"ALERTAS|{'|'.join(items)}"
+                alerts_list.append({
+                    "id": int(p["id"]),
+                    "name": p["name"],
+                    "quantity": int(p["quantity"]),
+                    "unit": p["unit"],
+                })
+            return json.dumps({"alerts": alerts_list}, ensure_ascii=False, separators=(",", ":"))
         return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
     else:
         return json.dumps({"error": f"Tool desconocida: {tool_name}"}, ensure_ascii=False)
@@ -201,67 +244,7 @@ def _format_result_display(tool_name: str, result_json: str) -> str:
     """
     Formatea el resultado de una tool en una representación legible
     para mostrar en la terminal.
-    Soporta tanto el formato JSON clásico como el nuevo formato compacto
-    (LISTA|... y ALERTAS|...) para ahorrar tokens en el LLM.
     """
-    # ── Formato compacto: LISTA|id:nombre(cantidad)|... ──
-    if result_json.startswith("LISTA|"):
-        parts = result_json.split("|")[1:]  # ["id:nombre(cantidad)", ...]
-        if not parts:
-            return "  📭  No hay productos que mostrar."
-        productos = []
-        for p in parts:
-            pid, resto = p.split(":", 1)
-            # resto tiene formato "Nombre(cantidadunidad)"
-            nombre = resto.split("(")[0]
-            cant_resto = resto.split("(")[1].rstrip(")")
-            productos.append({"id": pid, "name": nombre, "cant_raw": cant_resto})
-        # Tabla bonita
-        col_id = max(2, max(len(p["id"]) for p in productos))
-        col_name = max(6, max(len(p["name"]) for p in productos))
-        col_cant = max(10, max(len(p["cant_raw"]) for p in productos))
-
-        sep = f"  ├{'─' * (col_id + 2)}┼{'─' * (col_name + 2)}┼{'─' * (col_cant + 2)}┤"
-        header = f"  │ {'ID'.ljust(col_id)} │ {'Nombre'.ljust(col_name)} │ {'Cantidad'.rjust(col_cant)} │"
-        lines = [
-            f"  ┌{'─' * (col_id + 2)}┬{'─' * (col_name + 2)}┬{'─' * (col_cant + 2)}┐",
-            header,
-            sep,
-        ]
-        for p in productos:
-            lines.append(f"  │ {p['id'].rjust(col_id)} │ {p['name'].ljust(col_name)} │ {p['cant_raw'].rjust(col_cant)} │")
-        lines.append(f"  └{'─' * (col_id + 2)}┴{'─' * (col_name + 2)}┴{'─' * (col_cant + 2)}┘")
-        lines.append(f"  📦  Total: {len(productos)} productos")
-        return "\n".join(lines)
-
-    # ── Formato compacto: ALERTAS|... ──
-    if result_json.startswith("ALERTAS|"):
-        parts = result_json.split("|")[1:]
-        if not parts or parts[0] == "sin_alertas":
-            return "  ✅  No hay productos con stock bajo. ¡Todo en orden!"
-        alertas = []
-        for p in parts:
-            pid, resto = p.split(":", 1)
-            nombre = resto.split("(")[0]
-            cant_resto = resto.split("(")[1].rstrip(")")
-            alertas.append({"id": pid, "name": nombre, "cant_raw": cant_resto})
-        col_id = max(2, max(len(a["id"]) for a in alertas))
-        col_name = max(6, max(len(a["name"]) for a in alertas))
-        col_cant = max(10, max(len(a["cant_raw"]) for a in alertas))
-        sep = f"  ├{'─' * (col_id + 2)}┼{'─' * (col_name + 2)}┼{'─' * (col_cant + 2)}┤"
-        header = f"  │ {'ID'.ljust(col_id)} │ {'Nombre'.ljust(col_name)} │ {'Cantidad'.rjust(col_cant)} │"
-        lines = [
-            f"  ┌{'─' * (col_id + 2)}┬{'─' * (col_name + 2)}┬{'─' * (col_cant + 2)}┐",
-            header,
-            sep,
-        ]
-        for a in alertas:
-            lines.append(f"  │ {a['id'].rjust(col_id)} │ {a['name'].ljust(col_name)} │ {a['cant_raw'].rjust(col_cant)} │")
-        lines.append(f"  └{'─' * (col_id + 2)}┴{'─' * (col_name + 2)}┴{'─' * (col_cant + 2)}┘")
-        lines.append(f"  ⚠️  Total: {len(alertas)} productos con stock bajo")
-        return "\n".join(lines)
-
-    # ── Formato JSON clásico ──
     try:
         data = json.loads(result_json)
     except (json.JSONDecodeError, TypeError):
@@ -275,34 +258,72 @@ def _format_result_display(tool_name: str, result_json: str) -> str:
     if data is None:
         return "  📭  No hay datos."
 
-    # list_products / get_alerts → lista de productos → tabla
+    # list_products → {"productos": [...]} → tabla
+    if isinstance(data, dict) and "productos" in data:
+        products = data["productos"]
+        if not products:
+            return "  📭  No hay productos que mostrar."
+        col_id = max(2, max(len(str(p.get("id", ""))) for p in products))
+        col_name = max(6, max(len(p.get("name", "")) for p in products))
+        col_qty = max(10, max(len(str(p.get("quantity", ""))) for p in products))
+        col_unit = max(8, max(len(p.get("unit", "")) for p in products))
+        sep = f"  ├{'─' * (col_id + 2)}┼{'─' * (col_name + 2)}┼{'─' * (col_qty + 2)}┼{'─' * (col_unit + 2)}┤"
+        header = f"  │ {'ID'.ljust(col_id)} │ {'Nombre'.ljust(col_name)} │ {'Cantidad'.rjust(col_qty)} │ {'Unidad'.ljust(col_unit)} │"
+        lines = [f"  ┌{'─' * (col_id + 2)}┬{'─' * (col_name + 2)}┬{'─' * (col_qty + 2)}┬{'─' * (col_unit + 2)}┐",
+                 header, sep]
+        for p in products:
+            pid = str(p.get("id", ""))
+            name = p.get("name", "")
+            qty = str(p.get("quantity", ""))
+            unit = p.get("unit", "")
+            lines.append(f"  │ {pid.rjust(col_id)} │ {name.ljust(col_name)} │ {qty.rjust(col_qty)} │ {unit.ljust(col_unit)} │")
+        lines.append(f"  └{'─' * (col_id + 2)}┴{'─' * (col_name + 2)}┴{'─' * (col_qty + 2)}┴{'─' * (col_unit + 2)}┘")
+        lines.append(f"  📦  Total: {len(products)} productos")
+        return "\n".join(lines)
+
+    # get_alerts → {"alerts": [...]} o {"alerts": [], "mensaje": "..."}
+    if isinstance(data, dict) and "alerts" in data:
+        alerts = data["alerts"]
+        if not alerts:
+            return "  ✅  No hay productos con stock bajo. ¡Todo en orden!"
+        col_id = max(2, max(len(str(a.get("id", ""))) for a in alerts))
+        col_name = max(6, max(len(a.get("name", "")) for a in alerts))
+        col_qty = max(10, max(len(str(a.get("quantity", ""))) for a in alerts))
+        col_unit = max(8, max(len(a.get("unit", "")) for a in alerts))
+        sep = f"  ├{'─' * (col_id + 2)}┼{'─' * (col_name + 2)}┼{'─' * (col_qty + 2)}┼{'─' * (col_unit + 2)}┤"
+        header = f"  │ {'ID'.ljust(col_id)} │ {'Nombre'.ljust(col_name)} │ {'Cantidad'.rjust(col_qty)} │ {'Unidad'.ljust(col_unit)} │"
+        lines = [f"  ┌{'─' * (col_id + 2)}┬{'─' * (col_name + 2)}┬{'─' * (col_qty + 2)}┬{'─' * (col_unit + 2)}┐",
+                 header, sep]
+        for a in alerts:
+            aid = str(a.get("id", ""))
+            name = a.get("name", "")
+            qty = str(a.get("quantity", ""))
+            unit = a.get("unit", "")
+            lines.append(f"  │ {aid.rjust(col_id)} │ {name.ljust(col_name)} │ {qty.rjust(col_qty)} │ {unit.ljust(col_unit)} │")
+        lines.append(f"  └{'─' * (col_id + 2)}┴{'─' * (col_name + 2)}┴{'─' * (col_qty + 2)}┴{'─' * (col_unit + 2)}┘")
+        lines.append(f"  ⚠️  Total: {len(alerts)} productos con stock bajo")
+        return "\n".join(lines)
+
+    # list_products (raw) → lista de productos → tabla
     if isinstance(data, list):
         if not data:
             if tool_name == "get_alerts":
                 return "  ✅  No hay productos con stock bajo. ¡Todo en orden!"
             return "  📭  No hay productos que mostrar."
-        # Calcular anchos de columna (mínimo el ancho del encabezado)
         col_id = max(2, max(len(str(p.get("id", ""))) for p in data))
         col_name = max(6, max(len(p.get("name", "")) for p in data))
         col_qty = max(10, max(len(str(p.get("quantity", ""))) for p in data))
         col_unit = max(8, max(len(p.get("unit", "")) for p in data))
-
         sep = f"  ├{'─' * (col_id + 2)}┼{'─' * (col_name + 2)}┼{'─' * (col_qty + 2)}┼{'─' * (col_unit + 2)}┤"
         header = f"  │ {'ID'.ljust(col_id)} │ {'Nombre'.ljust(col_name)} │ {'Cantidad'.rjust(col_qty)} │ {'Unidad'.ljust(col_unit)} │"
-
         lines = [f"  ┌{'─' * (col_id + 2)}┬{'─' * (col_name + 2)}┬{'─' * (col_qty + 2)}┬{'─' * (col_unit + 2)}┐",
-                 header,
-                 sep]
-
+                 header, sep]
         for p in data:
             pid = str(p.get("id", ""))
             name = p.get("name", "")
             qty = str(p.get("quantity", ""))
             unit = p.get("unit", "")
-            lines.append(
-                f"  │ {pid.rjust(col_id)} │ {name.ljust(col_name)} │ {qty.rjust(col_qty)} │ {unit.ljust(col_unit)} │"
-            )
-
+            lines.append(f"  │ {pid.rjust(col_id)} │ {name.ljust(col_name)} │ {qty.rjust(col_qty)} │ {unit.ljust(col_unit)} │")
         lines.append(f"  └{'─' * (col_id + 2)}┴{'─' * (col_name + 2)}┴{'─' * (col_qty + 2)}┴{'─' * (col_unit + 2)}┘")
         lines.append(f"  📦  Total: {len(data)} productos")
         return "\n".join(lines)
@@ -313,7 +334,20 @@ def _format_result_display(tool_name: str, result_json: str) -> str:
         qty = data.get("quantity", "")
         unit = data.get("unit", "")
         pid = data.get("id", "")
-        return f"  ✅  #{pid} {name} → {qty} {unit}"
+        # Si add_product detectó que ya existía y lo actualizó
+        if data.get("_action") == "updated_existing":
+            resultado = f"  🔄  #{pid} {name} → stock actualizado a {qty} {unit} (el producto ya existía)"
+        else:
+            resultado = f"  ✅  #{pid} {name} → {qty} {unit}"
+        # Si es update_stock y queda poco stock (<10), avisar automáticamente
+        if tool_name == "update_stock":
+            try:
+                qty_num = int(qty)
+                if qty_num < 10:
+                    resultado += f"\n  ⚠️  ¡Atención! {name} está a punto de agotarse ({qty} {unit}). Deberías reponerlo pronto."
+            except (ValueError, TypeError):
+                pass
+        return resultado
 
     return result_json
 
@@ -366,28 +400,61 @@ def _build_system_prompt() -> str:
     """Construye el prompt del sistema con el rol y las herramientas disponibles."""
     return """Eres un asistente de IA especializado en la gestión de inventario de una tienda de suministros para cafeterías con dos locales físicos.
 
-Tus funciones principales:
-1. Consultar el inventario para ver productos y sus cantidades usando "list_products"
-2. Añadir nuevos productos cuando lleguen usando "add_product"
-3. Registrar entradas de stock (reposiciones/entregas) y salidas (ventas) SIEMPRE usando la herramienta "update_stock"
-4. Alertar cuando un producto esté cerca de agotarse (menos de 10 unidades) usando "get_alerts"
-
-Tienes acceso a las siguientes herramientas:
+Tienes estas herramientas:
 - list_products: Ver todo el inventario
 - add_product: Añadir un nuevo producto
-- update_stock: Actualizar cantidades (positivo = entrada, negativo = salida)
-- get_alerts: Ver productos con stock bajo
+- update_stock: Actualizar cantidades (positivo = entrada, negativo = salida). Usa el NOMBRE del producto, no el ID.
+- get_alerts: Ver productos con stock bajo (<10 unidades)
 
-REGLAS OBLIGATORIAS (incumplirlas causará errores graves):
-1. NUNCA digas que actualizaste el stock sin haber llamado a update_stock. Si necesitas modificar cantidades, DEBES usar la herramienta.
-2. Cuando el usuario mencione ventas, gastos o salidas de productos: llama a update_stock con delta NEGATIVO.
-3. Cuando el usuario mencione entregas, reposiciones o entradas de productos: llama a update_stock con delta POSITIVO.
-4. Antes de llamar a update_stock, SIEMPRE usa list_products para obtener el ID correcto del producto.
-5. Si hay múltiples productos que actualizar, hazlo UNO POR UNO llamando a update_stock cada vez.
-6. Después de cada update_stock, llama a get_alerts para avisar si algún producto está cerca de agotarse.
-7. Cuando te pregunten por el inventario, USA SIEMPRE list_products, no respondas de memoria.
-8. Responde en español de forma natural y amigable, como un encargado de tienda resolutivo.
-9. Al listar productos, formatea cada uno como: "Nombre (cantidad unidad)". Por ejemplo: "Café Arábica Molido (25 kg)", no uses la palabra "con"."""
+## REGLAS ABSOLUTAS (incumplirlas causará errores):
+
+1. **UNA SOLA ACCIÓN POR VEZ**: El usuario siempre pide UNA cosa a la vez. Ejecuta SOLO las herramientas necesarias para esa acción. No añadas pasos extra no solicitados.
+   - ✅ Si dice "añade 20kg de Café Arábica" o similar → llama SOLO a add_product (una vez, no list_products ni nada más). El sistema ya sabe gestionar el resto internamente, incluso si el producto ya existe (lo actualizará automáticamente sumando la cantidad).
+   - ✅ Si dice "resta 5 de café arábica" o "reponemos 20 de Azúcar Blanco" → llama SOLO a update_stock con el NOMBRE del producto (no el ID).
+   - ✅ Si dice "enséñame las alertas" o "dame los productos bajos" → llama SOLO a get_alerts.
+   - ✅ Si dice "lista productos" o "enséñame el inventario" → llama SOLO a list_products.
+   - ❌ NUNCA llames list_products después de add_product.
+   - ❌ NUNCA llames get_alerts después de update_stock, a menos que el usuario lo pida explícitamente.
+   - ❌ NUNCA llames list_products después de update_stock.
+
+2. **update_stock — USA EL NOMBRE, NO EL ID**: Cuando el usuario pida actualizar stock de un producto, usa `update_stock` con el parámetro `product_name` (string con el nombre del producto). El sistema internamente resolverá el nombre al ID correcto. NO necesitas llamar a list_products primero para buscar IDs.
+   - ✅ `update_stock(product_name="Café Arábica Molido", delta=-5)`
+   - ✅ `update_stock(product_name="Azúcar Blanco", delta=20)`
+   - ❌ NUNCA intentes pasar un ID numérico como product_id.
+
+3. **NO necesitas buscar IDs**: update_stock acepta el nombre del producto directamente. El sistema lo resuelve automáticamente. No llames a list_products antes de update_stock.
+
+4. **NO hagas llamadas paralelas múltiples**: Ejecuta UNA tool a la vez.
+
+5. **Responde en español**, de forma natural, amigable y MUY CONCISA (máximo 2 líneas). No añadas información extra, solo confirma lo que se hizo y pregunta "¿Quieres algo más?".
+
+6. **AVISO DE STOCK BAJO**: Cuando ejecutes `update_stock` con delta NEGATIVO, si la cantidad final queda por debajo de 10, avisa al usuario en tu respuesta de forma sencilla. No llames a get_alerts por tu cuenta.
+   - ✅ "He registrado la venta. Quedan 8 — cuidado, está por agotarse. ¿Quieres algo más?"
+
+7. **NO REPITAS LA TABLA EN TEXTO**: Cuando el sistema muestre un resultado (tabla de productos, alertas, stock actualizado, etc.), **NO vuelvas a enumerar los productos en tu respuesta**. Limítate a un comentario breve:
+   - ✅ Si el usuario pidió ver el inventario: "Aquí tienes el inventario completo. ¿Quieres algo más?"
+   - ✅ Si el usuario pidió las alertas: "Estos son los productos que tienen bajo stock. Deberías reponerlos pronto. ¿Quieres algo más?"
+   - ✅ Si el usuario añadió/actualizó stock: "Hecho. ¿Quieres algo más?"
+   - ❌ No menciones ningún producto concreto en tu respuesta textual.
+
+8. **RESPUESTAS MÍNIMAS POR ACCIÓN**:
+   - **Añadir producto**: confirma solo el nombre y cantidad añadidos. "Hecho. Se ha añadido [producto] con [cantidad] [unidad]. ¿Quieres algo más?"
+   - **Actualizar stock**: confirma el cambio. "Listo. Stock actualizado. ¿Quieres algo más?"
+   - **Ver inventario**: "Aquí tienes el inventario completo. ¿Quieres algo más?"
+   - **Alertas**: "Estos son los productos que tienen bajo stock. Deberías reponerlos pronto. ¿Quieres algo más?" """
+
+
+def _create_fallback_tool_call(tool_name: str, args_str: str) -> object:
+    """Crea un objeto simulando una tool_call para el fallback de texto plano."""
+    class _SimulatedFunction:
+        def __init__(self, name, arguments):
+            self.name = name
+            self.arguments = arguments
+    class _SimulatedToolCall:
+        def __init__(self, tname, astr):
+            self.id = f"call_fallback_{tname}"
+            self.function = _SimulatedFunction(tname, astr)
+    return _SimulatedToolCall(tool_name, args_str)
 
 
 def call_llm(messages: list[dict]) -> dict[str, Any]:
@@ -416,20 +483,69 @@ def call_llm(messages: list[dict]) -> dict[str, Any]:
             max_tokens=4096,
             tools=TOOLS,
             tool_choice="auto",
+            parallel_tool_calls=False,
         )
 
         message = response.choices[0].message
 
-        # ── El LLM quiere llamar a una o más herramientas ──
+        # ── El LLM quiere llamar a una o más herramientas (nativo) ──
         if message.tool_calls:
             return {
                 "tool": message.tool_calls,
                 "message": message,
             }
 
-        # ── El LLM da una respuesta textual ──
+        # ── Fallback: El LLM a veces escribe la función como texto plano
+        #    en lugar de usar tool_calls nativos. Pueden ser varios formatos:
+        #    <function=list_products></function>  (sin args)
+        #    <function(list_products){}></function>
+        #    <function=add_product>{"name":"..."}</function>
+        #    (con igual y argumentos, o con paréntesis)
         content = (message.content or "").strip()
         if content:
+            import re
+
+            # Formato 1: <function=nombre></function> (sin argumentos, ej: list_products)
+            match_simple = re.search(
+                r'<function=(\w+)>\s*</function>',
+                content,
+            )
+            if match_simple:
+                tool_name = match_simple.group(1)
+                return {
+                    "tool": [_create_fallback_tool_call(tool_name, "{}")],
+                    "message": message,
+                }
+
+            # Formato 2: <function(nombre){args}</function> (con argumentos JSON y paréntesis)
+            match_with_args = re.search(
+                r'<function\((\w+)\)\s*(\{.*?\})\s*</function>',
+                content,
+                re.DOTALL,
+            )
+            if match_with_args:
+                tool_name = match_with_args.group(1)
+                tool_args_str = match_with_args.group(2)
+                return {
+                    "tool": [_create_fallback_tool_call(tool_name, tool_args_str)],
+                    "message": message,
+                }
+
+            # Formato 3: <function=nombre>{args}</function> (con igual y argumentos JSON)
+            match_equal_args = re.search(
+                r'<function=(\w+)>\s*(\{.*?\})\s*</function>',
+                content,
+                re.DOTALL,
+            )
+            if match_equal_args:
+                tool_name = match_equal_args.group(1)
+                tool_args_str = match_equal_args.group(2)
+                return {
+                    "tool": [_create_fallback_tool_call(tool_name, tool_args_str)],
+                    "message": message,
+                }
+
+            # ── El LLM da una respuesta textual normal ──
             return {"response": content}
         else:
             return {"response": "No tengo una respuesta para eso."}
@@ -497,6 +613,9 @@ def run_agent():
 
             # ═══════════════ BUCLE HERRAMIENTAS ═══════════════════════
             # Se repite mientras el LLM siga pidiendo llamar a tools
+            # Acumula las llamadas internas y solo muestra el resultado relevante
+
+            tool_calls_made: list[dict] = []
 
             while True:
                 # ────────── 2. PENSAR ──────────
@@ -518,6 +637,38 @@ def run_agent():
                 # ────────── 4. RESPUESTA FINAL ──────────
                 if "response" in result:
                     response_msg = result["response"]
+                    # ── Mostrar solo el resultado relevante de las tools ──
+                    if tool_calls_made:
+                        # Si el primer tool fue list_products y no es el único,
+                        # es una búsqueda interna → mostrar solo el tool final
+                        first = tool_calls_made[0]["name"]
+                        last = tool_calls_made[-1]
+                        last_name = last["name"]
+                        is_internal_lookup = (
+                            first == "list_products" and len(tool_calls_made) > 1
+                        )
+
+                        if is_internal_lookup:
+                            # Mostrar solo el resultado de la tool final
+                            tmsg = {
+                                "add_product": "✅ Producto añadido:",
+                                "update_stock": "📦 Stock actualizado:",
+                                "get_alerts": "⚠️ Productos con stock bajo:",
+                                "list_products": "📋 Inventario completo:",
+                            }.get(last_name, f"🔧 {last_name}:")
+                            print(f"\n{tmsg}")
+                            print(_format_result_display(last_name, last["result"]))
+                        else:
+                            # Mostrar todos los tools (el usuario pidió verlos)
+                            for t in tool_calls_made:
+                                tmsg = {
+                                    "list_products": "📋 Aquí tienes la lista de productos:",
+                                    "get_alerts": "⚠️ Estos son los productos con poco stock:",
+                                    "add_product": "➕ Producto añadido correctamente:",
+                                    "update_stock": "📦 Stock actualizado:",
+                                }.get(t["name"], f"🔧  Usando: {t['name']}")
+                                print(f"\n{tmsg}")
+                                print(_format_result_display(t["name"], t["result"]))
                     print(f"\n🤖  Agente: {response_msg}")
                     log_event("agent", response_msg)
                     messages.append({"role": "assistant", "content": response_msg})
@@ -527,73 +678,50 @@ def run_agent():
                 if "tool" in result:
                     tool_calls = result["tool"]  # lista de tool_calls
                     llm_message = result["message"]
-                    tool_messages = []  # acumulador para todas las respuestas
 
-                    # Procesar CADA tool call que el LLM haya solicitado
-                    for tool_call in tool_calls:
-                        tool_name = tool_call.function.name
-                        tool_args = json.loads(tool_call.function.arguments) or {}
+                    # Procesar SOLO UNA tool call a la vez (evitar paralelismo)
+                    tool_call = tool_calls[0]
+                    tool_name = tool_call.function.name
+                    tool_args = json.loads(tool_call.function.arguments) or {}
 
-                        # ─── Mensajes amigables según la tool ───
-                        TOOL_MESSAGES = {
-                            "list_products": "📋 Aquí tienes la lista de productos:",
-                            "get_alerts": "⚠️ Estos son los productos con poco stock:",
-                            "add_product": "➕ Producto añadido correctamente:",
-                            "update_stock": "📦 Stock actualizado:",
-                        }
-                        tool_display = TOOL_MESSAGES.get(tool_name, f"🔧  Usando: {tool_name}")
+                    # Ejecutar la tool llamando a la API
+                    try:
+                        tool_result = run_tool(tool_name, tool_args)
+                        log_event("tool", tool_result, tool_name)
+                    except Exception as e:
+                        tool_result = json.dumps({"error": str(e)}, ensure_ascii=False)
+                        log_event("tool", tool_result, tool_name)
 
-                        print(f"\n{tool_display}")
-                        if tool_args:
-                            if tool_name == "update_stock":
-                                delta = tool_args.get("delta", 0)
-                                acción = "entrada de" if delta > 0 else "salida de"
-                                print(f"     {acción} {abs(delta)} unidades (ID: {tool_args.get('product_id', '?')})")
-                            elif tool_name == "add_product":
-                                print(f"     {tool_args.get('name', '')} — {tool_args.get('quantity', '')} {tool_args.get('unit', '')}")
-                            elif tool_name == "get_alerts" and "threshold" in tool_args:
-                                print(f"     Umbral: {tool_args['threshold']} unidades")
-                            elif tool_args:
-                                args_preview = json.dumps(tool_args, ensure_ascii=False)
-                                print(f"     Args: {args_preview}")
-
-                        # Ejecutar la tool llamando a la API (con protección)
-                        try:
-                            tool_result = run_tool(tool_name, tool_args)
-                            print(_format_result_display(tool_name, tool_result))
-                            log_event("tool", tool_result, tool_name)
-                        except Exception as e:
-                            tool_result = json.dumps({"error": str(e)}, ensure_ascii=False)
-                            print(f"  ⚠️  Error: {e}")
-                            log_event("tool", tool_result, tool_name)
-
-                        # Inyectar el resultado de la tool en el historial
-                        tool_messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": tool_result,
-                        })
+                    # Acumular la llamada para mostrarla al final
+                    tool_calls_made.append({
+                        "name": tool_name,
+                        "args": tool_args,
+                        "result": tool_result,
+                    })
 
                     # ────────── 4. ACTUALIZAR ──────────
-                    # Construimos el mensaje del asistente con TODAS las tool_calls
+                    # Construimos el mensaje del asistente con SOLO UNA tool call
                     messages.append({
                         "role": "assistant",
                         "content": llm_message.content or None,
                         "tool_calls": [
                             {
-                                "id": tc.id,
+                                "id": tool_call.id,
                                 "type": "function",
                                 "function": {
-                                    "name": tc.function.name,
-                                    "arguments": tc.function.arguments,
+                                    "name": tool_call.function.name,
+                                    "arguments": tool_call.function.arguments,
                                 },
                             }
-                            for tc in llm_message.tool_calls
                         ],
                     })
 
-                    # Añadir todos los resultados de tools al historial
-                    messages.extend(tool_messages)
+                    # Añadir el resultado de la tool al historial
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result,
+                    })
 
                     # ⬆ Volver a PENSAR con el nuevo contexto
 
